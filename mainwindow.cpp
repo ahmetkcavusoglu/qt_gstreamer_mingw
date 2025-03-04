@@ -22,20 +22,35 @@ MainWindow::~MainWindow()
 void MainWindow::startStream()
 {
     qDebug() << "Kamera akışı başlatılıyor...";
-
-    // Eğer daha önce çalışan bir işlem varsa önce durdur
     if (gstProcess->state() == QProcess::Running) {
         stopStream();
     }
 
-    // GStreamer pipeline komutu
-    QString gstCmd = "gst-launch-1.0 autovideosrc ! videoconvert ! autovideosink";
+    // GStreamer'ın gerçek yolu - sizin belirttiğiniz yol
+    QString gstPath = "C:/gstreamer/1.0/mingw_x86_64/bin/gst-launch-1.0.exe";
 
-    // Terminalde komutu çalıştır
-    gstProcess->start("cmd.exe", QStringList() << "/c" << gstCmd);
+    QStringList arguments;
+    arguments << "-v" << "autovideosrc" << "!" << "videoconvert" << "!" << "autovideosink";
 
-    if (!gstProcess->waitForStarted()) {
-        qDebug() << "GStreamer başlatılamadı!";
+    qDebug() << "Çalıştırılacak komut:" << gstPath << arguments.join(" ");
+
+    // Bağlantıları temizle ve yeniden oluştur
+    disconnect(gstProcess, &QProcess::readyReadStandardOutput, nullptr, nullptr);
+    disconnect(gstProcess, &QProcess::readyReadStandardError, nullptr, nullptr);
+
+    // Çıktıları yakalamak için bağlantıları ekleyin
+    connect(gstProcess, &QProcess::readyReadStandardOutput, [this]() {
+        qDebug() << "GST OUTPUT:" << gstProcess->readAllStandardOutput();
+    });
+    connect(gstProcess, &QProcess::readyReadStandardError, [this]() {
+        qDebug() << "GST ERROR:" << gstProcess->readAllStandardError();
+    });
+
+    // Doğrudan GStreamer programını çalıştır
+    gstProcess->start(gstPath, arguments);
+
+    if (!gstProcess->waitForStarted(3000)) {
+        qDebug() << "GStreamer başlatılamadı! Hata:" << gstProcess->errorString();
     } else {
         qDebug() << "GStreamer çalışıyor...";
     }
